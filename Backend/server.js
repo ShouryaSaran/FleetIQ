@@ -14,6 +14,7 @@ const serviceRoutes = require("./routes/serviceRoutes");
 const reportsRoutes = require("./routes/reportsRoutes");
 const usersRoutes = require("./routes/usersRoutes");
 const authRoutes = require("./routes/auth");
+const rolesRoutes = require("./routes/rolesRoutes");
 const authMiddleware = require("./middleware/authMiddleware");
 const roleMiddleware = require("./middleware/roleMiddleware");
 
@@ -50,6 +51,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/api/auth", authRoutes);
+app.use("/api/roles", rolesRoutes);
 app.use("/api/cars", authMiddleware, writeAccessMiddleware, carsRoutes);
 app.use("/api/customers", authMiddleware, writeAccessMiddleware, customersRoutes);
 app.use("/api/suppliers", authMiddleware, writeAccessMiddleware, suppliersRoutes);

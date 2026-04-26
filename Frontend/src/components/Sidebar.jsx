@@ -1,13 +1,15 @@
 import { NavLink } from "react-router-dom";
+import { useAuth } from "../hooks/useAuth";
 
-const navItems = [
-  { path: "/", label: "Dashboard", icon: "dashboard" },
-  { path: "/cars", label: "Cars", icon: "cars" },
-  { path: "/customers", label: "Customers", icon: "customers" },
-  { path: "/sales", label: "Sales", icon: "sales" },
-  { path: "/payments", label: "Payments", icon: "payments" },
-  { path: "/service", label: "Service", icon: "service" },
-  { path: "/reports", label: "Reports", icon: "reports" },
+const allNavItems = [
+  { path: "/dashboard", label: "Dashboard", icon: "dashboard" },
+  { path: "/cars",      label: "Cars",       icon: "cars" },
+  { path: "/customers", label: "Customers",  icon: "customers" },
+  { path: "/suppliers", label: "Suppliers",  icon: "suppliers" },
+  { path: "/sales",     label: "Sales",      icon: "sales" },
+  { path: "/payments",  label: "Payments",   icon: "payments" },
+  { path: "/service",   label: "Service",    icon: "service" },
+  { path: "/reports",   label: "Reports",    icon: "reports", managerOnly: true },
 ];
 
 function Icon({ name }) {
@@ -27,12 +29,16 @@ function Icon({ name }) {
     payments: (
       <path d="M3 6h18v12H3V6Zm2 4h14V8H5v2Zm0 6h5v-2H5v2Zm9-1a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
     ),
+    suppliers: (
+      <path d="M20 7l-8-4-8 4v10l8 4 8-4V7zm-8 1.56L16.57 11 12 13.44 7.43 11 12 8.56zM5 12.28l6 3v6.32l-6-3v-6.32zm8 3v6.32l6-3v-6.32l-6 3z" />
+    ),
     service: (
       <path d="M21 7.5a5.5 5.5 0 0 1-7 5.3L7.8 19a2.8 2.8 0 0 1-4-4l6.2-6.2A5.5 5.5 0 0 1 16.5 2L13 5.5 15.5 8 19 4.5c1.2.8 2 1.9 2 3Z" />
     ),
     reports: (
       <path d="M4 20V4h16v16H4Zm4-3h2V9H8v8Zm4 0h2V6h-2v11Zm4 0h2v-5h-2v5Z" />
     ),
+    logout: null,
   };
 
   return (
@@ -42,16 +48,37 @@ function Icon({ name }) {
   );
 }
 
+function LogoutIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <polyline points="16 17 21 12 16 7" />
+      <line x1="21" y1="12" x2="9" y2="12" />
+    </svg>
+  );
+}
+
+function getInitials(name) {
+  if (!name) return "?";
+  return name.trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+}
+
 function Sidebar() {
+  const { user, logout } = useAuth();
+
+  const navItems = allNavItems.filter(
+    (item) => !item.managerOnly || user?.role_name === "Manager"
+  );
+
   return (
     <aside className="sidebar">
-      <div className="brand">AutoInventory</div>
+      <div className="brand">Smart Vehicle IMS</div>
+
       <nav className="sidebar-nav" aria-label="Primary navigation">
         {navItems.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}
-            end={item.path === "/"}
             className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}
           >
             <Icon name={item.icon} />
@@ -59,12 +86,23 @@ function Sidebar() {
           </NavLink>
         ))}
       </nav>
-      <div className="sidebar-user">
-        <div className="avatar">AR</div>
-        <div>
-          <strong>Alex Rivera</strong>
-          <span>Inventory Manager</span>
+
+      <div className="sidebar-footer">
+        <div className="sidebar-user">
+          <div className="avatar">{getInitials(user?.name)}</div>
+          <div className="sidebar-user-info">
+            <strong>{user?.name || "Employee"}</strong>
+            <span>{user?.role_name || ""}</span>
+          </div>
         </div>
+        <button
+          type="button"
+          className="sidebar-logout-btn"
+          onClick={() => logout()}
+        >
+          <LogoutIcon />
+          <span>Sign Out</span>
+        </button>
       </div>
     </aside>
   );

@@ -3,8 +3,10 @@ import Sidebar from "./Sidebar";
 
 const pageTitles = {
   "/": "Dashboard",
+  "/dashboard": "Dashboard",
   "/cars": "Car Inventory",
   "/customers": "Customers",
+  "/suppliers": "Supplier Management",
   "/sales": "Sales",
   "/payments": "Payments",
   "/service": "Service Records",
