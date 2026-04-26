@@ -1,5 +1,8 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../utils/api";
+import { usePermission } from "../hooks/usePermission";
+import { useAuth } from "../hooks/useAuth";
+import logger from "../utils/logger";
 
 const initialPart = {
   part_name: "",
@@ -30,13 +33,21 @@ const formatAmount = (value) => {
     return "-";
   }
 
-  return new Intl.NumberFormat("en-US", {
+  return new Intl.NumberFormat("en-IN", {
     style: "currency",
-    currency: "USD",
+    currency: "INR",
   }).format(Number(value));
 };
 
 function ServiceRecordsPage() {
+  const { canCreate, canDelete } = usePermission("service");
+  const { user } = useAuth();
+
+  useEffect(() => {
+    logger.nav(`Page mounted: Service Records user=${user?.username} role=${user?.role_name}`);
+    return () => logger.nav("Page unmounted: Service Records");
+  }, []);
+
   const [records, setRecords] = useState([]);
   const [cars, setCars] = useState([]);
   const [centers, setCenters] = useState([]);
@@ -59,14 +70,12 @@ function ServiceRecordsPage() {
   );
 
   const fetchRecords = async () => {
+    logger.api("Fetching service records...");
     const response = await apiFetch("/service");
-
-    if (!response.ok) {
-      throw new Error("Unable to fetch service records.");
-    }
-
+    if (!response.ok) throw new Error("Unable to fetch service records.");
     const data = await response.json();
     setRecords(Array.isArray(data) ? data : []);
+    logger.api(`Service records loaded: ${Array.isArray(data) ? data.length : 0} records`);
   };
 
   useEffect(() => {
@@ -174,11 +183,10 @@ function ServiceRecordsPage() {
     setSuccess("");
 
     try {
+      logger.api(`Creating service record: car_id=${form.car_id} center_id=${form.center_id}`);
       const response = await apiFetch("/service", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           car_id: Number(form.car_id),
           center_id: Number(form.center_id),
@@ -198,6 +206,7 @@ function ServiceRecordsPage() {
         throw new Error(result.message || "Unable to add service record.");
       }
 
+      logger.api(`Service record created: service_id=${result.serviceId}`);
       await fetchRecords();
       setForm(initialForm);
       setIsFormOpen(false);
@@ -205,11 +214,43 @@ function ServiceRecordsPage() {
       setDetailsByRecord({});
       setSuccess("Service record added successfully.");
     } catch (submitError) {
+      logger.error(`Failed to create service record: ${submitError.message}`);
       setError(submitError.message);
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const handleDelete = async (serviceId) => {
+    if (!window.confirm(`Delete service record #${serviceId}?`)) return;
+    setError("");
+    setSuccess("");
+
+    try {
+      logger.api(`Deleting service record: service_id=${serviceId}`);
+      const response = await apiFetch(`/service/${serviceId}`, { method: "DELETE" });
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || "Unable to delete service record.");
+      }
+
+      logger.api(`Service record deleted: service_id=${serviceId}`);
+      if (expandedId === serviceId) setExpandedId(null);
+      setDetailsByRecord((prev) => {
+        const next = { ...prev };
+        delete next[serviceId];
+        return next;
+      });
+      await fetchRecords();
+      setSuccess("Service record deleted successfully.");
+    } catch (deleteError) {
+      logger.error(`Failed to delete service record: ${deleteError.message}`);
+      setError(deleteError.message);
+    }
+  };
+
+  const colSpan = 5 + (canDelete ? 1 : 0);
 
   return (
     <section className="page-section service-page">
@@ -218,17 +259,19 @@ function ServiceRecordsPage() {
           <h2>Service Records</h2>
           <p>Track service jobs, centers, parts, and total maintenance costs.</p>
         </div>
-        <button
-          className="primary-action"
-          type="button"
-          onClick={() => {
-            setIsFormOpen(true);
-            setError("");
-            setSuccess("");
-          }}
-        >
-          Add Service Record
-        </button>
+        {canCreate && (
+          <button
+            className="primary-action"
+            type="button"
+            onClick={() => {
+              setIsFormOpen(true);
+              setError("");
+              setSuccess("");
+            }}
+          >
+            Add Service Record
+          </button>
+        )}
       </div>
 
       {success && <div className="notice success">{success}</div>}
@@ -372,12 +415,13 @@ function ServiceRecordsPage() {
                 <th>Service Center</th>
                 <th>Date</th>
                 <th>Total Cost</th>
+                {canDelete && <th>Actions</th>}
               </tr>
             </thead>
             <tbody>
               {records.length === 0 ? (
                 <tr>
-                  <td colSpan="5">No service records found.</td>
+                  <td colSpan={colSpan}>No service records found.</td>
                 </tr>
               ) : (
                 records.map((record) => {
@@ -392,10 +436,23 @@ function ServiceRecordsPage() {
                         <td>{getValue(record, ["center_name", "Center_Name", "service_center_name"], "-")}</td>
                         <td>{formatDate(getValue(record, ["service_date", "Service_Date"]))}</td>
                         <td>{formatAmount(getValue(record, ["total_cost", "Total_Cost"]))}</td>
+                        {canDelete && (
+                          <td onClick={(e) => e.stopPropagation()}>
+                            <div className="row-actions">
+                              <button
+                                className="table-action danger"
+                                type="button"
+                                onClick={() => handleDelete(serviceId)}
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </td>
+                        )}
                       </tr>
                       {expandedId === serviceId && (
                         <tr className="details-row">
-                          <td colSpan="5">
+                          <td colSpan={colSpan}>
                             <div className="service-details">
                               {details ? (
                                 details.length === 0 ? (

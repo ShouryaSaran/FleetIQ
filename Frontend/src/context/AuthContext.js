@@ -1,5 +1,6 @@
 import { createContext, createElement, useCallback, useEffect, useMemo, useReducer } from "react";
 import { API_BASE_URL, configureAuthHandlers } from "../utils/api";
+import logger from "../utils/logger";
 
 const initialState = {
   user: null,
@@ -11,26 +12,11 @@ const initialState = {
 const authReducer = (state, action) => {
   switch (action.type) {
     case "LOGIN":
-      return {
-        ...state,
-        user: action.payload.user,
-        token: action.payload.token,
-        isAuthenticated: true,
-        isLoading: false,
-      };
+      return { ...state, user: action.payload.user, token: action.payload.token, isAuthenticated: true, isLoading: false };
     case "LOGOUT":
-      return {
-        ...state,
-        user: null,
-        token: null,
-        isAuthenticated: false,
-        isLoading: false,
-      };
+      return { ...state, user: null, token: null, isAuthenticated: false, isLoading: false };
     case "SET_LOADING":
-      return {
-        ...state,
-        isLoading: action.payload,
-      };
+      return { ...state, isLoading: action.payload };
     default:
       return state;
   }
@@ -57,19 +43,15 @@ export function AuthProvider({ children }) {
 
     if (storedToken && storedUser) {
       try {
-        dispatch({
-          type: "LOGIN",
-          payload: {
-            token: storedToken,
-            user: JSON.parse(storedUser),
-          },
-        });
+        const user = JSON.parse(storedUser);
+        logger.auth(`Session restored from localStorage: ${user.username} role=${user.role_name}`);
+        dispatch({ type: "LOGIN", payload: { token: storedToken, user } });
       } catch {
+        logger.auth("Session expired, redirecting to login");
         localStorage.removeItem("authToken");
         localStorage.removeItem("authUser");
         dispatch({ type: "LOGOUT" });
       }
-
       return;
     }
 
@@ -82,13 +64,12 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(async (username, password) => {
     dispatch({ type: "SET_LOADING", payload: true });
+    logger.auth(`Login attempt: ${username}`);
 
     try {
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
       });
 
@@ -109,16 +90,11 @@ export function AuthProvider({ children }) {
       localStorage.setItem("authToken", data.token);
       localStorage.setItem("authUser", JSON.stringify(user));
 
-      dispatch({
-        type: "LOGIN",
-        payload: {
-          token: data.token,
-          user,
-        },
-      });
-
+      logger.auth(`Login success: ${username} role=${user.role_name}`);
+      dispatch({ type: "LOGIN", payload: { token: data.token, user } });
       return { token: data.token, user };
     } catch (error) {
+      logger.error(`Login failed: ${error.message}`);
       dispatch({ type: "SET_LOADING", payload: false });
       throw error;
     }
@@ -128,15 +104,14 @@ export function AuthProvider({ children }) {
     async ({ notifyServer = true } = {}) => {
       const token = getToken();
       const authId = token ? getAuthIdFromToken(token) : null;
+      const storedUser = localStorage.getItem("authUser");
+      const username = storedUser ? JSON.parse(storedUser)?.username : "unknown";
 
       if (notifyServer && authId) {
         try {
           await fetch(`${API_BASE_URL}/auth/logout`, {
             method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
             body: JSON.stringify({ auth_id: authId }),
           });
         } catch {
@@ -144,6 +119,7 @@ export function AuthProvider({ children }) {
         }
       }
 
+      logger.auth(`User logged out: ${username}`);
       localStorage.removeItem("authToken");
       localStorage.removeItem("authUser");
       dispatch({ type: "LOGOUT" });
@@ -156,12 +132,7 @@ export function AuthProvider({ children }) {
   }, [getToken, logout]);
 
   const value = useMemo(
-    () => ({
-      ...state,
-      login,
-      logout,
-      getToken,
-    }),
+    () => ({ ...state, login, logout, getToken }),
     [state, login, logout, getToken]
   );
 

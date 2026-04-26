@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "../utils/api";
+import { usePermission } from "../hooks/usePermission";
+import { useAuth } from "../hooks/useAuth";
+import logger from "../utils/logger";
 
 const initialForm = {
   sale_id: "",
@@ -24,14 +27,22 @@ const formatAmount = (value) => {
   if (value === undefined || value === null || value === "") {
     return "-";
   }
-
-  return new Intl.NumberFormat("en-US", {
+  return new Intl.NumberFormat("en-IN", {
     style: "currency",
-    currency: "USD",
+    currency: "INR",
+    maximumFractionDigits: 2,
   }).format(Number(value));
 };
 
 function PaymentsPage() {
+  const { canCreate, canDelete } = usePermission("payments");
+  const { user } = useAuth();
+
+  useEffect(() => {
+    logger.nav(`Page mounted: Payments user=${user?.username} role=${user?.role_name}`);
+    return () => logger.nav("Page unmounted: Payments");
+  }, []);
+
   const [payments, setPayments] = useState([]);
   const [sales, setSales] = useState([]);
   const [form, setForm] = useState(initialForm);
@@ -42,14 +53,12 @@ function PaymentsPage() {
   const [success, setSuccess] = useState("");
 
   const fetchPayments = async () => {
+    logger.api("Fetching payments...");
     const response = await apiFetch("/payments");
-
-    if (!response.ok) {
-      throw new Error("Unable to fetch payments.");
-    }
-
+    if (!response.ok) throw new Error("Unable to fetch payments.");
     const data = await response.json();
     setPayments(Array.isArray(data) ? data : []);
+    logger.api(`Payments loaded: ${Array.isArray(data) ? data.length : 0} records`);
   };
 
   useEffect(() => {
@@ -98,11 +107,10 @@ function PaymentsPage() {
     setSuccess("");
 
     try {
+      logger.api(`Creating payment for sale_id=${form.sale_id}`);
       const response = await apiFetch("/payments", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           sale_id: Number(form.sale_id),
           amount: Number(form.amount),
@@ -118,16 +126,43 @@ function PaymentsPage() {
         throw new Error(result.message || "Unable to record payment.");
       }
 
+      logger.api(`Payment created: payment_id=${result.paymentId}`);
       await fetchPayments();
       setForm(initialForm);
       setIsFormOpen(false);
       setSuccess("Payment recorded successfully.");
     } catch (submitError) {
+      logger.error(`Failed to record payment: ${submitError.message}`);
       setError(submitError.message);
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const handleDelete = async (paymentId) => {
+    if (!window.confirm(`Delete payment #${paymentId}?`)) return;
+    setError("");
+    setSuccess("");
+
+    try {
+      logger.api(`Deleting payment: payment_id=${paymentId}`);
+      const response = await apiFetch(`/payments/${paymentId}`, { method: "DELETE" });
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || "Unable to delete payment.");
+      }
+
+      logger.api(`Payment deleted: payment_id=${paymentId}`);
+      await fetchPayments();
+      setSuccess("Payment deleted successfully.");
+    } catch (deleteError) {
+      logger.error(`Failed to delete payment: ${deleteError.message}`);
+      setError(deleteError.message);
+    }
+  };
+
+  const colSpan = 6 + (canDelete ? 1 : 0);
 
   return (
     <section className="page-section payments-page">
@@ -136,17 +171,19 @@ function PaymentsPage() {
           <h2>Payments</h2>
           <p>Record and monitor payment status for completed vehicle sales.</p>
         </div>
-        <button
-          className="primary-action"
-          type="button"
-          onClick={() => {
-            setIsFormOpen(true);
-            setSuccess("");
-            setError("");
-          }}
-        >
-          Record Payment
-        </button>
+        {canCreate && (
+          <button
+            className="primary-action"
+            type="button"
+            onClick={() => {
+              setIsFormOpen(true);
+              setSuccess("");
+              setError("");
+            }}
+          >
+            Record Payment
+          </button>
+        )}
       </div>
 
       {success && <div className="notice success">{success}</div>}
@@ -254,12 +291,13 @@ function PaymentsPage() {
                 <th>Method</th>
                 <th>Date</th>
                 <th>Status</th>
+                {canDelete && <th>Actions</th>}
               </tr>
             </thead>
             <tbody>
               {payments.length === 0 ? (
                 <tr>
-                  <td colSpan="6">No payments found.</td>
+                  <td colSpan={colSpan}>No payments found.</td>
                 </tr>
               ) : (
                 payments.map((payment) => {
@@ -282,6 +320,19 @@ function PaymentsPage() {
                           {status}
                         </span>
                       </td>
+                      {canDelete && (
+                        <td>
+                          <div className="row-actions">
+                            <button
+                              className="table-action danger"
+                              type="button"
+                              onClick={() => handleDelete(paymentId)}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   );
                 })

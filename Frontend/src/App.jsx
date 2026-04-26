@@ -11,7 +11,18 @@ import PaymentsPage from "./pages/PaymentsPage";
 import SalesPage from "./pages/SalesPage";
 import ServiceRecordsPage from "./pages/ServiceRecordsPage";
 import SuppliersPage from "./pages/Suppliers";
+import InventoryPage from "./pages/InventoryPage";
+import ServiceCentersPage from "./pages/ServiceCentersPage";
+import { usePermission } from "./hooks/usePermission";
 import "./App.css";
+
+function RoleRoute({ resource, children }) {
+  const { canView } = usePermission(resource);
+  if (!canView) {
+    return <Navigate to="/dashboard" replace state={{ toast: "Access Denied." }} />;
+  }
+  return children;
+}
 
 function PageShell({ title, subtitle, children }) {
   return (
@@ -67,6 +78,16 @@ function Customers() {
   );
 }
 
+function UserManagement() {
+  return (
+    <PageShell title="User Management" subtitle="Manage employee accounts and roles.">
+      <article className="panel">
+        <div className="empty-state">User management coming soon.</div>
+      </article>
+    </PageShell>
+  );
+}
+
 function App() {
   return (
     <AuthProvider>
@@ -80,14 +101,41 @@ function App() {
           <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
             <Route path="/"          element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<DashboardReportsPage title="Dashboard" />} />
-            <Route path="/cars"      element={<CarInventoryPage />} />
-            <Route path="/customers" element={<Customers />} />
-            <Route path="/suppliers" element={<SuppliersPage />} />
-            <Route path="/sales"     element={<SalesPage />} />
-            <Route path="/payments"  element={<PaymentsPage />} />
-            <Route path="/service"   element={<ServiceRecordsPage />} />
-            <Route path="/reports"   element={<DashboardReportsPage title="Reports" />} />
-            <Route path="*"          element={<Navigate to="/dashboard" replace />} />
+
+            <Route path="/cars" element={
+              <RoleRoute resource="cars"><CarInventoryPage /></RoleRoute>
+            } />
+            <Route path="/customers" element={
+              <RoleRoute resource="customers"><Customers /></RoleRoute>
+            } />
+            <Route path="/suppliers" element={
+              <RoleRoute resource="suppliers"><SuppliersPage /></RoleRoute>
+            } />
+            <Route path="/inventory" element={
+              <RoleRoute resource="inventory"><InventoryPage /></RoleRoute>
+            } />
+            <Route path="/sales" element={
+              <RoleRoute resource="sales"><SalesPage /></RoleRoute>
+            } />
+            <Route path="/payments" element={
+              <RoleRoute resource="payments"><PaymentsPage /></RoleRoute>
+            } />
+            <Route path="/service" element={
+              <RoleRoute resource="service"><ServiceRecordsPage /></RoleRoute>
+            } />
+            <Route path="/service-centers" element={
+              <RoleRoute resource="service-centers"><ServiceCentersPage /></RoleRoute>
+            } />
+            <Route path="/reports" element={
+              <RoleRoute resource="reports">
+                <DashboardReportsPage title="Reports" />
+              </RoleRoute>
+            } />
+            <Route path="/users" element={
+              <RoleRoute resource="users"><UserManagement /></RoleRoute>
+            } />
+
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
           </Route>
         </Routes>
       </BrowserRouter>

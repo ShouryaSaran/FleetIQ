@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { apiFetch } from "../utils/api";
+import { usePermission } from "../hooks/usePermission";
+import logger from "../utils/logger";
+import { useAuth } from "../hooks/useAuth";
 
 const initialForm = {
   model: "",
@@ -18,14 +21,23 @@ const formatPrice = (value) => {
   if (value === undefined || value === null || value === "") {
     return "-";
   }
-
-  return new Intl.NumberFormat("en-US", {
+  return new Intl.NumberFormat("en-IN", {
     style: "currency",
-    currency: "USD",
+    currency: "INR",
+    maximumFractionDigits: 2,
   }).format(Number(value));
 };
 
 function CarInventoryPage() {
+  const { canCreate, canEdit, canDelete } = usePermission("cars");
+  const showActionsColumn = canEdit || canDelete;
+  const { user } = useAuth();
+
+  useEffect(() => {
+    logger.nav(`Page mounted: Cars Inventory user=${user?.username} role=${user?.role_name}`);
+    return () => logger.nav("Page unmounted: Cars Inventory");
+  }, []);
+
   const [cars, setCars] = useState([]);
   const [form, setForm] = useState(initialForm);
   const [editingCarId, setEditingCarId] = useState(null);
@@ -38,6 +50,7 @@ function CarInventoryPage() {
   const fetchCars = useCallback(async () => {
     setIsLoading(true);
     setError("");
+    logger.api("Fetching cars...");
 
     try {
       const response = await apiFetch("/cars");
@@ -48,7 +61,9 @@ function CarInventoryPage() {
 
       const data = await response.json();
       setCars(Array.isArray(data) ? data : []);
+      logger.api(`Cars loaded: ${Array.isArray(data) ? data.length : 0} records`);
     } catch (fetchError) {
+      logger.error(`Failed to load cars: ${fetchError.message}`);
       setError(fetchError.message);
     } finally {
       setIsLoading(false);
@@ -116,11 +131,13 @@ function CarInventoryPage() {
     try {
       const url = editingCarId ? `/cars/${editingCarId}` : "/cars";
       const method = editingCarId ? "PUT" : "POST";
+
+      if (!editingCarId) logger.api(`Creating new car: ${JSON.stringify(payload)}`);
+      else logger.api(`Updating car: car_id=${editingCarId}`);
+
       const response = await apiFetch(url, {
         method,
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
 
@@ -130,12 +147,16 @@ function CarInventoryPage() {
         throw new Error(result.message || "Unable to save car.");
       }
 
+      if (editingCarId) logger.api(`Car updated: car_id=${editingCarId}`);
+      else logger.api(`Car created: car_id=${result.carId}`);
+
       await fetchCars();
       setForm(initialForm);
       setEditingCarId(null);
       setIsFormOpen(false);
       setSuccess(editingCarId ? "Car updated successfully." : "Car added successfully.");
     } catch (saveError) {
+      logger.error(`Failed to save car: ${saveError.message}`);
       setError(saveError.message);
     } finally {
       setIsSaving(false);
@@ -154,18 +175,19 @@ function CarInventoryPage() {
     setSuccess("");
 
     try {
-      const response = await apiFetch(`/cars/${carId}`, {
-        method: "DELETE",
-      });
+      logger.api(`Deleting car: car_id=${carId}`);
+      const response = await apiFetch(`/cars/${carId}`, { method: "DELETE" });
       const result = await response.json();
 
       if (!response.ok) {
         throw new Error(result.message || "Unable to delete car.");
       }
 
+      logger.api(`Car deleted: car_id=${carId}`);
       await fetchCars();
       setSuccess("Car deleted successfully.");
     } catch (deleteError) {
+      logger.error(`Failed to delete car: ${deleteError.message}`);
       setError(deleteError.message);
     }
   };
@@ -177,9 +199,11 @@ function CarInventoryPage() {
           <h2>Car Inventory</h2>
           <p>Manage stock, pricing, availability, and supplier assignments.</p>
         </div>
-        <button className="primary-action" type="button" onClick={openAddForm}>
-          Add Car
-        </button>
+        {canCreate && (
+          <button className="primary-action" type="button" onClick={openAddForm}>
+            Add Car
+          </button>
+        )}
       </div>
 
       {success && <div className="notice success">{success}</div>}
@@ -296,13 +320,13 @@ function CarInventoryPage() {
                 <th>Price</th>
                 <th>Status</th>
                 <th>Supplier</th>
-                <th>Actions</th>
+                {showActionsColumn && <th>Actions</th>}
               </tr>
             </thead>
             <tbody>
               {cars.length === 0 ? (
                 <tr>
-                  <td colSpan="9">No cars found.</td>
+                  <td colSpan={showActionsColumn ? 9 : 8}>No cars found.</td>
                 </tr>
               ) : (
                 cars.map((car) => {
@@ -329,16 +353,22 @@ function CarInventoryPage() {
                           "-"
                         )}
                       </td>
-                      <td>
-                        <div className="row-actions">
-                          <button className="table-action" type="button" onClick={() => openEditForm(car)}>
-                            Edit
-                          </button>
-                          <button className="table-action danger" type="button" onClick={() => handleDelete(car)}>
-                            Delete
-                          </button>
-                        </div>
-                      </td>
+                      {showActionsColumn && (
+                        <td>
+                          <div className="row-actions">
+                            {canEdit && (
+                              <button className="table-action" type="button" onClick={() => openEditForm(car)}>
+                                Edit
+                              </button>
+                            )}
+                            {canDelete && (
+                              <button className="table-action danger" type="button" onClick={() => handleDelete(car)}>
+                                Delete
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   );
                 })

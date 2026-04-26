@@ -1,133 +1,61 @@
 const db = require("../config/db");
-
-const getTableColumns = async (tableName) => {
-  const [columns] = await db.query(
-    `
-      SELECT COLUMN_NAME
-      FROM INFORMATION_SCHEMA.COLUMNS
-      WHERE TABLE_SCHEMA = DATABASE()
-        AND TABLE_NAME = ?
-    `,
-    [tableName]
-  );
-
-  return columns.map((column) => column.COLUMN_NAME);
-};
-
-const hasColumn = (columns, columnName) => columns.includes(columnName);
-
-const firstColumn = (columns, columnNames, alias) => {
-  const columnName = columnNames.find((name) => hasColumn(columns, name));
-  return columnName ? `${alias}.\`${columnName}\`` : "NULL";
-};
+const logger = require("../config/logger");
 
 const getAllSales = async (req, res) => {
   try {
-    const [salesColumns, carColumns, customerColumns, userColumns] = await Promise.all([
-      getTableColumns("Sales"),
-      getTableColumns("Cars"),
-      getTableColumns("Customers"),
-      getTableColumns("Users"),
-    ]);
-
-    const saleIdColumn = firstColumn(salesColumns, ["sale_id", "Sale_ID"], "s");
-    const saleCarIdColumn = firstColumn(salesColumns, ["car_id", "Car_ID"], "s");
-    const saleCustomerIdColumn = firstColumn(salesColumns, ["customer_id", "Customer_ID"], "s");
-    const saleEmployeeIdColumn = firstColumn(salesColumns, ["employee_id", "Employee_ID"], "s");
-    const saleDateColumn = firstColumn(salesColumns, ["sale_date", "Sale_Date"], "s");
-    const salePriceColumn = firstColumn(salesColumns, ["sale_price", "Sale_Price"], "s");
-    const carIdColumn = firstColumn(carColumns, ["car_id", "Car_ID"], "c");
-    const customerIdColumn = firstColumn(customerColumns, ["customer_id", "Customer_ID"], "cu");
-    const userIdColumn = firstColumn(userColumns, ["employee_id", "Employee_ID", "user_id", "User_ID"], "u");
-    const carModelColumn = firstColumn(
-      carColumns,
-      ["model", "Model", "car_model", "Car_Model", "Car_Name", "name", "Name"],
-      "c"
-    );
-    const customerNameColumn = firstColumn(
-      customerColumns,
-      ["customer_name", "Customer_Name", "name", "Name", "full_name", "Full_Name"],
-      "cu"
-    );
-    const employeeNameColumn = firstColumn(
-      userColumns,
-      ["employee_name", "Employee_Name", "user_name", "User_Name", "name", "Name", "full_name", "Full_Name"],
-      "u"
-    );
-
     const [sales] = await db.query(`
-      SELECT
-        ${saleIdColumn} AS sale_id,
-        ${saleCarIdColumn} AS car_id,
-        ${carModelColumn} AS car_model,
-        ${saleCustomerIdColumn} AS customer_id,
-        ${customerNameColumn} AS customer_name,
-        ${saleEmployeeIdColumn} AS employee_id,
-        ${employeeNameColumn} AS employee_name,
-        ${saleDateColumn} AS sale_date,
-        ${salePriceColumn} AS sale_price
-      FROM Sales s
-      LEFT JOIN Cars c ON ${saleCarIdColumn} = ${carIdColumn}
-      LEFT JOIN Customers cu ON ${saleCustomerIdColumn} = ${customerIdColumn}
-      LEFT JOIN Users u ON ${saleEmployeeIdColumn} = ${userIdColumn}
-      ORDER BY ${saleDateColumn} DESC, ${saleIdColumn} DESC
+      SELECT s.sale_id, s.sale_date, s.sale_price,
+             c.brand, c.model,
+             cu.name AS customer_name,
+             u.full_name AS employee_name
+      FROM sales s
+      JOIN car c ON s.car_id = c.car_id
+      JOIN customer cu ON s.customer_id = cu.customer_id
+      JOIN user u ON s.user_id = u.user_id
+      ORDER BY s.sale_date DESC, s.sale_id DESC
     `);
-
+    logger.info(`[SALES] Fetched ${sales.length} sales`);
     res.status(200).json(sales);
   } catch (error) {
-    res.status(500).json({
-      message: "Failed to fetch sales.",
-      error: error.message,
-    });
+    logger.error(`[SALES ERROR] Failed to fetch sales: ${error.message}`);
+    res.status(500).json({ message: "Failed to fetch sales.", error: error.message });
   }
 };
 
 const createSale = async (req, res) => {
-  const { car_id, customer_id, employee_id, sale_date, sale_price } = req.body;
+  const { car_id, customer_id, user_id, sale_date, sale_price } = req.body;
 
-  if (!car_id || !customer_id || !employee_id || !sale_date || sale_price === undefined) {
+  if (!car_id || !customer_id || !user_id || !sale_date || sale_price === undefined) {
     return res.status(400).json({
-      message: "car_id, customer_id, employee_id, sale_date, and sale_price are required.",
+      message: "car_id, customer_id, user_id, sale_date, and sale_price are required.",
     });
   }
 
-  let connection;
+  logger.info(`[TRANSACTION] Sale transaction started: car_id=${car_id} customer_id=${customer_id}`);
 
   try {
-    connection = await db.getConnection();
-    await connection.beginTransaction();
-
-    const [result] = await connection.query(
-      `
-        INSERT INTO Sales (car_id, customer_id, employee_id, sale_date, sale_price)
-        VALUES (?, ?, ?, ?, ?)
-      `,
-      [car_id, customer_id, employee_id, sale_date, sale_price]
+    const [result] = await db.query(
+      "INSERT INTO sales (car_id, customer_id, user_id, sale_date, sale_price) VALUES (?, ?, ?, ?, ?)",
+      [car_id, customer_id, user_id, sale_date, sale_price]
     );
-
-    await connection.commit();
-
-    res.status(201).json({
-      message: "Vehicle sale completed successfully.",
-      saleId: result.insertId,
-    });
+    logger.info(`[TRANSACTION] Sale transaction committed: sale_id=${result.insertId}`);
+    res.status(201).json({ message: "Sale recorded successfully.", saleId: result.insertId });
   } catch (error) {
-    if (connection) {
-      await connection.rollback();
-    }
-
-    res.status(500).json({
-      message: "Failed to complete vehicle sale transaction.",
-      error: error.message,
-    });
-  } finally {
-    if (connection) {
-      connection.release();
-    }
+    logger.error(`[TRANSACTION] Sale transaction rolled back: ${error.message}`);
+    res.status(500).json({ message: "Failed to record sale.", error: error.message });
   }
 };
 
-module.exports = {
-  getAllSales,
-  createSale,
+const deleteSale = async (req, res) => {
+  try {
+    const [result] = await db.query("DELETE FROM sales WHERE sale_id = ?", [req.params.id]);
+    if (result.affectedRows === 0) return res.status(404).json({ message: "Sale not found." });
+    logger.info(`[SALES] Sale deleted: sale_id=${req.params.id}`);
+    res.status(200).json({ message: "Sale deleted successfully." });
+  } catch (error) {
+    logger.error(`[SALES ERROR] Failed to delete sale: ${error.message}`);
+    res.status(500).json({ message: "Failed to delete sale.", error: error.message });
+  }
 };
+
+module.exports = { getAllSales, createSale, deleteSale };

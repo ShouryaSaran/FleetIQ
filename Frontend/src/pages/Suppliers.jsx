@@ -1,5 +1,8 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../utils/api";
+import { usePermission } from "../hooks/usePermission";
+import { useAuth } from "../hooks/useAuth";
+import logger from "../utils/logger";
 
 const PHONE_RE = /^\d{10}$/;
 
@@ -37,6 +40,15 @@ function validate(f) {
 }
 
 export default function SuppliersPage() {
+  const { canCreate, canEdit, canDelete } = usePermission("suppliers");
+  const showActionsColumn = canEdit || canDelete;
+  const { user } = useAuth();
+
+  useEffect(() => {
+    logger.nav(`Page mounted: Suppliers user=${user?.username} role=${user?.role_name}`);
+    return () => logger.nav("Page unmounted: Suppliers");
+  }, []);
+
   const [suppliers, setSuppliers] = useState([]);
   const [cars, setCars] = useState([]);
   const [search, setSearch] = useState("");
@@ -57,10 +69,12 @@ export default function SuppliersPage() {
   const showToast = (message, type = "success") => setToast({ message, type });
 
   const fetchSuppliers = async () => {
+    logger.api("Fetching suppliers...");
     const res = await apiFetch("/suppliers");
     if (!res.ok) throw new Error("Unable to fetch suppliers.");
     const data = await res.json();
     setSuppliers(Array.isArray(data) ? data : []);
+    logger.api(`Suppliers loaded: ${Array.isArray(data) ? data.length : 0} records`);
   };
 
   useEffect(() => {
@@ -177,6 +191,8 @@ export default function SuppliersPage() {
     try {
       const url = editingId ? `/suppliers/${editingId}` : "/suppliers";
       const method = editingId ? "PUT" : "POST";
+      if (!editingId) logger.api(`Creating supplier: ${form.supplier_name.trim()}`);
+      else logger.api(`Updating supplier: supplier_id=${editingId}`);
       const res = await apiFetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
@@ -189,16 +205,20 @@ export default function SuppliersPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to save supplier.");
       if (editingId) {
+        logger.api(`Supplier updated: supplier_id=${editingId}`);
         setExpandedData((prev) => {
           const next = { ...prev };
           delete next[editingId];
           return next;
         });
+      } else {
+        logger.api(`Supplier created: supplier_id=${data.supplier_id ?? "?"}`);
       }
       await fetchSuppliers();
       closeForm();
       showToast(editingId ? "Supplier updated successfully." : "Supplier added successfully.");
     } catch (err) {
+      logger.error(`Failed to save supplier: ${err.message}`);
       showToast(err.message, "error");
     } finally {
       setIsSaving(false);
@@ -211,6 +231,7 @@ export default function SuppliersPage() {
     if (!window.confirm(`Are you sure you want to delete ${name}?`)) return;
     setDeleteError("");
     try {
+      logger.api(`Deleting supplier: supplier_id=${id}`);
       const res = await apiFetch(`/suppliers/${id}`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) {
@@ -220,6 +241,7 @@ export default function SuppliersPage() {
         }
         throw new Error(data.message || "Failed to delete supplier.");
       }
+      logger.api(`Supplier deleted: supplier_id=${id}`);
       setExpandedData((prev) => {
         const next = { ...prev };
         delete next[id];
@@ -229,6 +251,7 @@ export default function SuppliersPage() {
       await fetchSuppliers();
       showToast("Supplier deleted successfully.");
     } catch (err) {
+      logger.error(`Failed to delete supplier: ${err.message}`);
       showToast(err.message, "error");
     }
   };
@@ -256,9 +279,11 @@ export default function SuppliersPage() {
             onChange={(e) => setSearch(e.target.value)}
             aria-label="Search suppliers"
           />
-          <button className="primary-action" type="button" onClick={openAdd}>
-            Add Supplier
-          </button>
+          {canCreate && (
+            <button className="primary-action" type="button" onClick={openAdd}>
+              Add Supplier
+            </button>
+          )}
         </div>
       </div>
 
@@ -359,7 +384,7 @@ export default function SuppliersPage() {
                 <th>Contact Number</th>
                 <th>Address</th>
                 <th>Cars Supplied</th>
-                <th>Actions</th>
+                {showActionsColumn && <th>Actions</th>}
               </tr>
             </thead>
             <tbody>
@@ -382,29 +407,35 @@ export default function SuppliersPage() {
                       <td>
                         <span className="count-badge count-badge--sm">{count}</span>
                       </td>
-                      <td>
-                        <div className="row-actions" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            className="table-action"
-                            type="button"
-                            onClick={() => openEdit(s)}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            className="table-action danger"
-                            type="button"
-                            onClick={() => handleDelete(s)}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
+                      {showActionsColumn && (
+                        <td>
+                          <div className="row-actions" onClick={(e) => e.stopPropagation()}>
+                            {canEdit && (
+                              <button
+                                className="table-action"
+                                type="button"
+                                onClick={() => openEdit(s)}
+                              >
+                                Edit
+                              </button>
+                            )}
+                            {canDelete && (
+                              <button
+                                className="table-action danger"
+                                type="button"
+                                onClick={() => handleDelete(s)}
+                              >
+                                Delete
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      )}
                     </tr>
 
                     {isExpanded && (
                       <tr className="details-row">
-                        <td colSpan="6">
+                        <td colSpan={showActionsColumn ? 6 : 5}>
                           <div className="supplier-cars-panel">
                             {!expanded || expanded.loading ? (
                               <p className="sup-detail-msg">Loading cars…</p>

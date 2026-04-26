@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { apiFetch } from "../utils/api";
+import { usePermission } from "../hooks/usePermission";
+import { useAuth } from "../hooks/useAuth";
+import logger from "../utils/logger";
 
 const initialForm = {
   car_id: "",
   customer_id: "",
-  employee_id: "",
+  user_id: "",
   sale_date: "",
   sale_price: "",
 };
@@ -27,13 +30,21 @@ const formatPrice = (value) => {
     return "-";
   }
 
-  return new Intl.NumberFormat("en-US", {
+  return new Intl.NumberFormat("en-IN", {
     style: "currency",
-    currency: "USD",
+    currency: "INR",
   }).format(Number(value));
 };
 
 function SalesPage() {
+  const { canCreate, canDelete } = usePermission("sales");
+  const { user } = useAuth();
+
+  useEffect(() => {
+    logger.nav(`Page mounted: Sales user=${user?.username} role=${user?.role_name}`);
+    return () => logger.nav("Page unmounted: Sales");
+  }, []);
+
   const [sales, setSales] = useState([]);
   const [cars, setCars] = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -55,14 +66,12 @@ function SalesPage() {
   );
 
   const fetchSales = async () => {
+    logger.api("Fetching sales...");
     const response = await apiFetch("/sales");
-
-    if (!response.ok) {
-      throw new Error("Unable to fetch sales.");
-    }
-
+    if (!response.ok) throw new Error("Unable to fetch sales.");
     const data = await response.json();
     setSales(Array.isArray(data) ? data : []);
+    logger.api(`Sales loaded: ${Array.isArray(data) ? data.length : 0} records`);
   };
 
   useEffect(() => {
@@ -120,15 +129,14 @@ function SalesPage() {
     setSuccess("");
 
     try {
+      logger.api(`Creating new sale: ${JSON.stringify({ car_id: form.car_id, customer_id: form.customer_id })}`);
       const response = await apiFetch("/sales", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           car_id: Number(form.car_id),
           customer_id: Number(form.customer_id),
-          employee_id: Number(form.employee_id),
+          user_id: Number(form.user_id),
           sale_date: form.sale_date,
           sale_price: Number(form.sale_price),
         }),
@@ -140,16 +148,43 @@ function SalesPage() {
         throw new Error(result.message || "Unable to create sale.");
       }
 
+      logger.api(`Sale created: sale_id=${result.saleId}`);
       await fetchSales();
       setForm(initialForm);
       setIsFormOpen(false);
       setSuccess("Sale completed successfully.");
     } catch (submitError) {
+      logger.error(`Failed to create sale: ${submitError.message}`);
       setError(submitError.message);
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const handleDelete = async (saleId) => {
+    if (!window.confirm(`Delete sale #${saleId}?`)) return;
+    setError("");
+    setSuccess("");
+
+    try {
+      logger.api(`Deleting sale: sale_id=${saleId}`);
+      const response = await apiFetch(`/sales/${saleId}`, { method: "DELETE" });
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || "Unable to delete sale.");
+      }
+
+      logger.api(`Sale deleted: sale_id=${saleId}`);
+      await fetchSales();
+      setSuccess("Sale deleted successfully.");
+    } catch (deleteError) {
+      logger.error(`Failed to delete sale: ${deleteError.message}`);
+      setError(deleteError.message);
+    }
+  };
+
+  const colSpan = 6 + (canDelete ? 1 : 0);
 
   return (
     <section className="page-section sales-page">
@@ -158,17 +193,19 @@ function SalesPage() {
           <h2>Sales</h2>
           <p>Complete vehicle sales and review transaction history.</p>
         </div>
-        <button
-          className="primary-action"
-          type="button"
-          onClick={() => {
-            setIsFormOpen(true);
-            setSuccess("");
-            setError("");
-          }}
-        >
-          New Sale
-        </button>
+        {canCreate && (
+          <button
+            className="primary-action"
+            type="button"
+            onClick={() => {
+              setIsFormOpen(true);
+              setSuccess("");
+              setError("");
+            }}
+          >
+            New Sale
+          </button>
+        )}
       </div>
 
       {success && <div className="notice success">{success}</div>}
@@ -251,22 +288,22 @@ function SalesPage() {
             <label>
               Employee
               <select
-                name="employee_id"
-                value={form.employee_id}
+                name="user_id"
+                value={form.user_id}
                 onChange={handleChange}
                 required
               >
                 <option value="">Select employee</option>
                 {employees.map((employee) => {
-                  const employeeId = getId(employee, ["employee_id", "Employee_ID", "user_id", "User_ID", "id"]);
+                  const employeeId = getId(employee, ["user_id", "employee_id", "Employee_ID", "id"]);
                   const employeeName = getText(employee, [
+                    "full_name",
                     "employee_name",
                     "Employee_Name",
                     "user_name",
                     "User_Name",
                     "name",
                     "Name",
-                    "full_name",
                   ]);
 
                   return (
@@ -323,12 +360,13 @@ function SalesPage() {
                 <th>Employee</th>
                 <th>Sale Date</th>
                 <th>Sale Price</th>
+                {canDelete && <th>Actions</th>}
               </tr>
             </thead>
             <tbody>
               {sales.length === 0 ? (
                 <tr>
-                  <td colSpan="6">No sales found.</td>
+                  <td colSpan={colSpan}>No sales found.</td>
                 </tr>
               ) : (
                 sales.map((sale) => {
@@ -357,6 +395,19 @@ function SalesPage() {
                       <td>{employee}</td>
                       <td>{formatDate(saleDate)}</td>
                       <td>{formatPrice(salePrice)}</td>
+                      {canDelete && (
+                        <td>
+                          <div className="row-actions">
+                            <button
+                              className="table-action danger"
+                              type="button"
+                              onClick={() => handleDelete(saleId)}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      )}
                     </tr>
                   );
                 })
