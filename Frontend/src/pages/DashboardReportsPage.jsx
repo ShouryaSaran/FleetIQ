@@ -27,10 +27,25 @@ function LoadingSpinner() {
   );
 }
 
-function StatCard({ label, value, colorClass }) {
+
+// SVG Icon components
+const CarIcon = () => (
+  <img src="/svg_324392.svg" alt="Car" className="stat-svg-icon" width={32} height={32} />
+);
+const CustomerIcon = () => (
+  <img src="/svg_502377.svg" alt="Customer" className="stat-svg-icon" width={32} height={32} />
+);
+const SalesIcon = () => (
+  <img src="/Sales amount.svg" alt="Sales" className="stat-svg-icon" width={32} height={32} />
+);
+const ReportsIcon = () => (
+  <img src="/records.svg" alt="Reports" className="stat-svg-icon" width={32} height={32} />
+);
+
+function StatCard({ label, value, colorClass, icon }) {
   return (
     <article className="stat-card">
-      <span className={`stat-icon ${colorClass}`}></span>
+      <span className={`stat-icon ${colorClass}`}>{icon}</span>
       <p>{label}</p>
       <strong>{value}</strong>
     </article>
@@ -88,10 +103,10 @@ function FullDashboard({ reports }) {
   return (
     <>
       <div className="stats-grid">
-        <StatCard label="Total Cars"       value={formatNumber(m.totalCars)}           colorClass="blue"   />
-        <StatCard label="Total Sales"      value={formatCurrency(m.totalSalesAmount)}  colorClass="green"  />
-        <StatCard label="Total Customers"  value={formatNumber(m.totalCustomers)}       colorClass="indigo" />
-        <StatCard label="Service Records"  value={formatNumber(m.totalServiceRecords)}  colorClass="gray"   />
+        <StatCard label="Total Cars"       value={formatNumber(m.totalCars)}           colorClass="blue"   icon={<CarIcon />} />
+        <StatCard label="Total Sales"      value={formatCurrency(m.totalSalesAmount)}  colorClass="green"  icon={<SalesIcon />} />
+        <StatCard label="Total Customers"  value={formatNumber(m.totalCustomers)}       colorClass="indigo" icon={<CustomerIcon />} />
+        <StatCard label="Service Records"  value={formatNumber(m.totalServiceRecords)}  colorClass="gray"   icon={<ReportsIcon />} />
       </div>
 
       <div className="reports-layout">
@@ -161,10 +176,10 @@ function SalesExecutiveDashboard({ cars, customers, sales, payments }) {
   return (
     <>
       <div className="stats-grid">
-        <StatCard label="Total Cars"        value={formatNumber(cars.length)}       colorClass="blue"   />
-        <StatCard label="Total Customers"   value={formatNumber(customers.length)}  colorClass="indigo" />
-        <StatCard label="Total Sales"       value={formatNumber(sales.length)}      colorClass="green"  />
-        <StatCard label="Sales Amount"      value={formatCurrency(totalSalesAmount)} colorClass="gray"  />
+        <StatCard label="Total Cars"        value={formatNumber(cars.length)}       colorClass="blue"   icon={<CarIcon />} />
+        <StatCard label="Total Customers"   value={formatNumber(customers.length)}  colorClass="indigo" icon={<CustomerIcon />} />
+        <StatCard label="Total Sales"       value={formatNumber(sales.length)}      colorClass="green"  icon={<SalesIcon />} />
+        <StatCard label="Sales Amount"      value={formatCurrency(totalSalesAmount)} colorClass="gray"  icon={<SalesIcon />} />
       </div>
 
       <div className="reports-layout">
@@ -195,9 +210,9 @@ function MechanicDashboard({ cars, inventory, serviceRecords }) {
   return (
     <>
       <div className="stats-grid">
-        <StatCard label="Total Cars"       value={formatNumber(cars.length)}           colorClass="blue" />
-        <StatCard label="Inventory Items"  value={formatNumber(totalInventoryQty)}     colorClass="indigo" />
-        <StatCard label="Service Records"  value={formatNumber(serviceRecords.length)} colorClass="gray"  />
+        <StatCard label="Total Cars"       value={formatNumber(cars.length)}           colorClass="blue"   icon={<CarIcon />} />
+        <StatCard label="Inventory Items"  value={formatNumber(totalInventoryQty)}     colorClass="indigo" icon={<SalesIcon />} />
+        <StatCard label="Service Records"  value={formatNumber(serviceRecords.length)} colorClass="gray"   icon={<ReportsIcon />} />
       </div>
 
       <div className="reports-layout">

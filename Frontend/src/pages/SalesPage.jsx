@@ -65,10 +65,18 @@ function SalesPage() {
     [cars]
   );
 
+  // Show read-only current-user field when employees list is unavailable or role is Sales Executive
+  const useCurrentUserForSale = employees.length === 0 || user?.role_name === "Sales Executive";
+
   const fetchSales = async () => {
     logger.api("Fetching sales...");
     const response = await apiFetch("/sales");
-    if (!response.ok) throw new Error("Unable to fetch sales.");
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      const msg = body.message || `HTTP ${response.status}`;
+      console.error("Sales fetch error:", msg);
+      throw new Error(msg);
+    }
     const data = await response.json();
     setSales(Array.isArray(data) ? data : []);
     logger.api(`Sales loaded: ${Array.isArray(data) ? data.length : 0} records`);
@@ -79,36 +87,53 @@ function SalesPage() {
       setIsLoading(true);
       setError("");
 
-      try {
-        const [salesResponse, carsResponse, customersResponse, employeesResponse] =
-          await Promise.all([
-            apiFetch("/sales"),
-            apiFetch("/cars"),
-            apiFetch("/customers"),
-            apiFetch("/users"),
-          ]);
+      const [salesRes, carsRes, customersRes, employeesRes] = await Promise.allSettled([
+        apiFetch("/sales"),
+        apiFetch("/cars"),
+        apiFetch("/customers"),
+        apiFetch("/sales/employees"),
+      ]);
 
-        if (!salesResponse.ok) throw new Error("Unable to fetch sales.");
-        if (!carsResponse.ok) throw new Error("Unable to fetch cars.");
-        if (!customersResponse.ok) throw new Error("Unable to fetch customers.");
-        if (!employeesResponse.ok) throw new Error("Unable to fetch employees.");
-
-        const [salesData, carsData, customersData, employeesData] = await Promise.all([
-          salesResponse.json(),
-          carsResponse.json(),
-          customersResponse.json(),
-          employeesResponse.json(),
-        ]);
-
-        setSales(Array.isArray(salesData) ? salesData : []);
-        setCars(Array.isArray(carsData) ? carsData : []);
-        setCustomers(Array.isArray(customersData) ? customersData : []);
-        setEmployees(Array.isArray(employeesData) ? employeesData : []);
-      } catch (loadError) {
-        setError(loadError.message);
-      } finally {
-        setIsLoading(false);
+      // Sales — controls table visibility; surface any failure
+      if (salesRes.status === "fulfilled" && salesRes.value.ok) {
+        const data = await salesRes.value.json();
+        setSales(Array.isArray(data) ? data : []);
+        logger.api(`Sales loaded: ${Array.isArray(data) ? data.length : 0} records`);
+      } else {
+        let msg = "Unable to fetch sales.";
+        if (salesRes.status === "rejected") {
+          msg = salesRes.reason.message;
+        } else {
+          const body = await salesRes.value.json().catch(() => ({}));
+          msg = body.message || `Sales fetch failed (HTTP ${salesRes.value.status})`;
+        }
+        logger.error(`Failed to fetch sales: ${msg}`);
+        console.error("Sales fetch error:", msg);
+        setError(msg);
       }
+
+      // Cars — form dropdown only, silent failure
+      if (carsRes.status === "fulfilled" && carsRes.value.ok) {
+        const data = await carsRes.value.json();
+        setCars(Array.isArray(data) ? data : []);
+      }
+
+      // Customers — form dropdown only, silent failure
+      if (customersRes.status === "fulfilled" && customersRes.value.ok) {
+        const data = await customersRes.value.json();
+        setCustomers(Array.isArray(data) ? data : []);
+      }
+
+      // Employees — fall back to current user if endpoint unavailable
+      if (employeesRes.status === "fulfilled" && employeesRes.value.ok) {
+        const data = await employeesRes.value.json();
+        setEmployees(Array.isArray(data) ? data : []);
+      } else {
+        console.warn("Employees endpoint unavailable; falling back to current user.");
+        logger.warn("Employees fetch failed; using current user as fallback.");
+      }
+
+      setIsLoading(false);
     };
 
     loadSalesPageData();
@@ -129,6 +154,7 @@ function SalesPage() {
     setSuccess("");
 
     try {
+      const userId = useCurrentUserForSale ? user?.employee_id : form.user_id;
       logger.api(`Creating new sale: ${JSON.stringify({ car_id: form.car_id, customer_id: form.customer_id })}`);
       const response = await apiFetch("/sales", {
         method: "POST",
@@ -136,7 +162,7 @@ function SalesPage() {
         body: JSON.stringify({
           car_id: Number(form.car_id),
           customer_id: Number(form.customer_id),
-          user_id: Number(form.user_id),
+          user_id: Number(userId),
           sale_date: form.sale_date,
           sale_price: Number(form.sale_price),
         }),
@@ -287,32 +313,31 @@ function SalesPage() {
 
             <label>
               Employee
-              <select
-                name="user_id"
-                value={form.user_id}
-                onChange={handleChange}
-                required
-              >
-                <option value="">Select employee</option>
-                {employees.map((employee) => {
-                  const employeeId = getId(employee, ["user_id", "employee_id", "Employee_ID", "id"]);
-                  const employeeName = getText(employee, [
-                    "full_name",
-                    "employee_name",
-                    "Employee_Name",
-                    "user_name",
-                    "User_Name",
-                    "name",
-                    "Name",
-                  ]);
+              {useCurrentUserForSale ? (
+                <input type="text" value={user?.name || ""} readOnly disabled />
+              ) : (
+                <select name="user_id" value={form.user_id} onChange={handleChange} required>
+                  <option value="">Select employee</option>
+                  {employees.map((employee) => {
+                    const employeeId = getId(employee, ["user_id", "employee_id", "Employee_ID", "id"]);
+                    const employeeName = getText(employee, [
+                      "full_name",
+                      "employee_name",
+                      "Employee_Name",
+                      "user_name",
+                      "User_Name",
+                      "name",
+                      "Name",
+                    ]);
 
-                  return (
-                    <option key={employeeId} value={employeeId}>
-                      {employeeName}
-                    </option>
-                  );
-                })}
-              </select>
+                    return (
+                      <option key={employeeId} value={employeeId}>
+                        {employeeName}
+                      </option>
+                    );
+                  })}
+                </select>
+              )}
             </label>
 
             <label>

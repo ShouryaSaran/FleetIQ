@@ -13,6 +13,7 @@ import ServiceRecordsPage from "./pages/ServiceRecordsPage";
 import SuppliersPage from "./pages/Suppliers";
 import InventoryPage from "./pages/InventoryPage";
 import ServiceCentersPage from "./pages/ServiceCentersPage";
+import UserManagementPage from "./pages/UserManagementPage";
 import { usePermission } from "./hooks/usePermission";
 import "./App.css";
 
@@ -78,15 +79,6 @@ function Customers() {
   );
 }
 
-function UserManagement() {
-  return (
-    <PageShell title="User Management" subtitle="Manage employee accounts and roles.">
-      <article className="panel">
-        <div className="empty-state">User management coming soon.</div>
-      </article>
-    </PageShell>
-  );
-}
 
 function App() {
   return (
@@ -94,8 +86,7 @@ function App() {
       <BrowserRouter>
         <Routes>
           {/* Public — redirect to /dashboard when already authenticated */}
-          <Route path="/login"  element={<PublicRoute><Login /></PublicRoute>} />
-          <Route path="/signup" element={<PublicRoute><Signup /></PublicRoute>} />
+          <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
 
           {/* Protected — redirect to /login when not authenticated */}
           <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
@@ -132,7 +123,10 @@ function App() {
               </RoleRoute>
             } />
             <Route path="/users" element={
-              <RoleRoute resource="users"><UserManagement /></RoleRoute>
+              <RoleRoute resource="users"><UserManagementPage /></RoleRoute>
+            } />
+            <Route path="/signup" element={
+              <RoleRoute resource="users"><Signup /></RoleRoute>
             } />
 
             <Route path="*" element={<Navigate to="/dashboard" replace />} />

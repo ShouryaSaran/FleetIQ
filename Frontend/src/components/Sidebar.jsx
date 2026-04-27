@@ -84,7 +84,10 @@ function Sidebar() {
 
   return (
     <aside className="sidebar">
-      <div className="brand">Smart Vehicle IMS</div>
+      <div className="brand">
+        <span className="brand-name">FleetIQ</span>
+        <span className="brand-sub">Vehicle Management System</span>
+      </div>
 
       <nav className="sidebar-nav" aria-label="Primary navigation">
         {navItems.map((item) => (

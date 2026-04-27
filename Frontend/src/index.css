@@ -1,3 +1,258 @@
-#root {
-  min-height: 100vh;
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* ── Fallback — dark values so page renders before JS sets data-theme ── */
+:root {
+  --bg-primary: #080C14;
+  --bg-secondary: #0D1117;
+  --bg-card: #0D1520;
+  --bg-card-hover: #111C2D;
+  --border: #1E3A5F;
+  --border-bright: #2563EB;
+  --text-primary: #E2E8F0;
+  --text-secondary: #64748B;
+  --text-muted: #334155;
+  --accent: #2563EB;
+  --accent-glow: #2563EB40;
+  --success: #10B981;
+  --success-bg: #10B98115;
+  --warning: #F59E0B;
+  --warning-bg: #F59E0B15;
+  --danger: #EF4444;
+  --danger-bg: #EF444415;
+  --purple: #8B5CF6;
+  --purple-bg: #8B5CF615;
+  --sidebar-bg: #080C14;
+  --header-bg: #0D1117;
+  --skeleton-base: #0D1520;
+  --skeleton-shine: #1a2744;
+  --input-bg: #080C14;
+  --overlay-bg: rgba(0, 0, 0, 0.7);
 }
+
+[data-theme="dark"] {
+  --bg-primary: #080C14;
+  --bg-secondary: #0D1117;
+  --bg-card: #0D1520;
+  --bg-card-hover: #111C2D;
+  --border: #1E3A5F;
+  --border-bright: #2563EB;
+  --text-primary: #E2E8F0;
+  --text-secondary: #64748B;
+  --text-muted: #334155;
+  --accent: #2563EB;
+  --accent-glow: #2563EB40;
+  --success: #10B981;
+  --success-bg: #10B98115;
+  --warning: #F59E0B;
+  --warning-bg: #F59E0B15;
+  --danger: #EF4444;
+  --danger-bg: #EF444415;
+  --purple: #8B5CF6;
+  --purple-bg: #8B5CF615;
+  --sidebar-bg: #080C14;
+  --header-bg: #0D1117;
+  --skeleton-base: #0D1520;
+  --skeleton-shine: #1a2744;
+  --input-bg: #080C14;
+  --overlay-bg: rgba(0, 0, 0, 0.7);
+}
+
+[data-theme="light"] {
+  --bg-primary: #F8FAFC;
+  --bg-secondary: #F1F5F9;
+  --bg-card: #FFFFFF;
+  --bg-card-hover: #F8FAFC;
+  --border: #E2E8F0;
+  --border-bright: #2563EB;
+  --text-primary: #0F172A;
+  --text-secondary: #64748B;
+  --text-muted: #94A3B8;
+  --accent: #2563EB;
+  --accent-glow: #2563EB30;
+  --success: #16A34A;
+  --success-bg: #DCFCE7;
+  --warning: #D97706;
+  --warning-bg: #FEF3C7;
+  --danger: #DC2626;
+  --danger-bg: #FEE2E2;
+  --purple: #7C3AED;
+  --purple-bg: #EDE9FE;
+  --sidebar-bg: #0F172A;
+  --header-bg: #FFFFFF;
+  --skeleton-base: #F1F5F9;
+  --skeleton-shine: #E2E8F0;
+  --input-bg: #F8FAFC;
+  --overlay-bg: rgba(0, 0, 0, 0.5);
+}
+
+* { font-family: 'Inter', sans-serif; box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg-primary); color: var(--text-primary); }
+
+#root { min-height: 100vh; }
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes scanline {
+  0%   { transform: translateY(-100%); }
+  100% { transform: translateY(100vh); }
+}
+@keyframes glow-pulse {
+  0%, 100% { box-shadow: 0 0 8px var(--accent-glow); }
+  50%       { box-shadow: 0 0 20px var(--accent-glow); }
+}
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes modalIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.fade-in-up { animation: fadeInUp 0.35s ease forwards; }
+.fade-in    { animation: fadeIn 0.3s ease forwards; }
+.stagger-1  { animation-delay: 0.05s; opacity: 0; }
+.stagger-2  { animation-delay: 0.10s; opacity: 0; }
+.stagger-3  { animation-delay: 0.15s; opacity: 0; }
+.stagger-4  { animation-delay: 0.20s; opacity: 0; }
+.stagger-5  { animation-delay: 0.25s; opacity: 0; }
+
+.skeleton {
+  background: linear-gradient(90deg, var(--skeleton-base) 25%, var(--skeleton-shine) 50%, var(--skeleton-base) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 4px;
+}
+
+/* ══ Light theme overrides ════════════════════════════════════════ */
+
+/* Sidebar stays dark in light mode */
+[data-theme="light"] .sidebar {
+  background: var(--sidebar-bg);
+  border-right-color: #1E3A5F;
+}
+[data-theme="light"] .brand-name { color: #2563EB; }
+[data-theme="light"] .brand-sub  { color: #475569; }
+[data-theme="light"] .nav-link   { color: #94A3B8; }
+[data-theme="light"] .nav-link:hover {
+  color: #E2E8F0;
+  background: rgba(255, 255, 255, 0.05);
+}
+[data-theme="light"] .nav-link.active {
+  color: #2563EB;
+  background: rgba(37, 99, 235, 0.15);
+  border-color: rgba(37, 99, 235, 0.3);
+}
+[data-theme="light"] .sidebar-footer      { border-top-color: #1E3A5F; }
+[data-theme="light"] .sidebar-logout-btn  { color: #94A3B8; border-top-color: #1E3A5F; }
+[data-theme="light"] .sidebar-logout-btn:hover {
+  color: #EF4444;
+  background: rgba(239, 68, 68, 0.1);
+}
+[data-theme="light"] .sidebar-user-info strong { color: #E2E8F0; }
+[data-theme="light"] .sidebar-user-info span   { color: #94A3B8; }
+[data-theme="light"] .avatar {
+  background: rgba(37, 99, 235, 0.2);
+  border-color: #2563EB;
+  color: #2563EB;
+}
+
+/* Header */
+[data-theme="light"] .top-header {
+  background: rgba(255, 255, 255, 0.95);
+  border-bottom: 1px solid #E2E8F0;
+}
+[data-theme="light"] .top-header h1 { color: #0F172A; }
+[data-theme="light"] .menu-button {
+  background: #F8FAFC;
+  border-color: #E2E8F0;
+}
+[data-theme="light"] .menu-button span   { background: #64748B; }
+[data-theme="light"] .menu-button:hover  { background: #F1F5F9; border-color: #CBD5E1; }
+
+/* Tables */
+[data-theme="light"] th { background: #F8FAFC; color: #64748B; }
+[data-theme="light"] tbody tr:hover td { background: #EFF6FF; }
+
+/* Metric / stat cards */
+[data-theme="light"] .stat-card {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+[data-theme="light"] .stat-card:hover {
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.1);
+}
+
+/* Skeleton */
+[data-theme="light"] .skeleton {
+  background: linear-gradient(90deg, #F1F5F9 25%, #E2E8F0 50%, #F1F5F9 75%);
+  background-size: 200% 100%;
+}
+
+/* Login page */
+[data-theme="light"] .login-page { background: #F8FAFC; }
+[data-theme="light"] .login-page::before {
+  background:
+    radial-gradient(ellipse 60% 50% at 20% 40%, rgba(37, 99, 235, 0.05) 0%, transparent 70%),
+    radial-gradient(ellipse 40% 60% at 80% 60%, rgba(124, 58, 237, 0.03) 0%, transparent 70%);
+}
+[data-theme="light"] .login-card {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+}
+[data-theme="light"] .login-input {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  color: #0F172A;
+}
+[data-theme="light"] .login-input:focus {
+  border-color: #2563EB;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+[data-theme="light"] .login-label          { color: #64748B; }
+[data-theme="light"] .login-title          { color: #0F172A; }
+[data-theme="light"] .login-subtitle       { color: #64748B; }
+[data-theme="light"] .login-remember-label { color: #64748B; }
+[data-theme="light"] .login-footer-note    { color: #94A3B8; }
+[data-theme="light"] .login-input-icon     { color: #94A3B8; }
+
+/* Signup page */
+[data-theme="light"] .signup-page { background: #F8FAFC; }
+[data-theme="light"] .signup-page::before {
+  background:
+    radial-gradient(ellipse 60% 50% at 20% 20%, rgba(37, 99, 235, 0.04) 0%, transparent 70%),
+    radial-gradient(ellipse 40% 40% at 80% 80%, rgba(124, 58, 237, 0.03) 0%, transparent 70%);
+}
+[data-theme="light"] .signup-card {
+  background: #FFFFFF;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+}
+[data-theme="light"] .signup-input,
+[data-theme="light"] .signup-select {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  color: #0F172A;
+}
+[data-theme="light"] .signup-input:focus,
+[data-theme="light"] .signup-select:focus {
+  border-color: #2563EB;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+[data-theme="light"] .signup-section-title { border-bottom-color: #E2E8F0; }
+[data-theme="light"] .signup-label         { color: #64748B; }
+[data-theme="light"] .signup-strength-bar  { background: #E2E8F0; }
+[data-theme="light"] .signup-tagline       { color: #64748B; }

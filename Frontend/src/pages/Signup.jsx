@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { API_BASE_URL } from "../utils/api";
+import { useNavigate } from "react-router-dom";
+import { apiFetch } from "../utils/api";
 import "./Signup.css";
 
 function CarIcon() {
@@ -112,7 +112,7 @@ export default function Signup() {
   const [successMsg, setSuccessMsg] = useState("");
 
   useEffect(() => {
-    fetch(`${API_BASE_URL}/roles`)
+    apiFetch("/roles")
       .then((res) => res.json())
       .then((data) => {
         if (Array.isArray(data)) setRoles(data);
@@ -122,10 +122,10 @@ export default function Signup() {
       .finally(() => setRolesLoading(false));
   }, []);
 
-  // Navigate to /login after success
+  // Navigate back to user management after success
   useEffect(() => {
     if (!successMsg) return;
-    const timer = setTimeout(() => navigate("/login", { replace: true }), 2000);
+    const timer = setTimeout(() => navigate("/users", { replace: true }), 2000);
     return () => clearTimeout(timer);
   }, [successMsg, navigate]);
 
@@ -146,7 +146,7 @@ export default function Signup() {
     setApiError("");
     setSubmitting(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/auth/signup`, {
+      const res = await apiFetch("/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -158,8 +158,8 @@ export default function Signup() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || "Signup failed.");
-      setSuccessMsg("Account created successfully. You can now log in.");
+      if (!res.ok) throw new Error(data.message || "Failed to create account.");
+      setSuccessMsg("Employee account created successfully. Returning to User Management…");
     } catch (err) {
       setApiError(err.message || "Something went wrong. Please try again.");
     } finally {
@@ -195,7 +195,7 @@ export default function Signup() {
           <div className="signup-logo-wrap"><CarIcon /></div>
           <h1 className="signup-title">Smart Vehicle IMS</h1>
           <p className="signup-subtitle">Vehicle Showroom Management</p>
-          <p className="signup-tagline">Create your employee account</p>
+          <p className="signup-tagline">Create a new employee account</p>
         </div>
 
         <form className="signup-form" onSubmit={handleSubmit} noValidate>
@@ -372,8 +372,7 @@ export default function Signup() {
         </form>
 
         <p className="signup-footer-note">
-          Already have an account?{" "}
-          <Link to="/login" className="signup-link">Sign in</Link>
+          Account will be immediately active after creation.
         </p>
       </div>
     </div>

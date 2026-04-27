@@ -118,7 +118,7 @@ export default function Login() {
           <div className="login-logo-wrap">
             <CarIcon />
           </div>
-          <h1 className="login-title">Smart Vehicle IMS</h1>
+          <h1 className="login-title">FleetIQ</h1>
           <p className="login-subtitle">Vehicle Showroom Management</p>
         </div>
 
